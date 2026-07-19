@@ -2,6 +2,7 @@
 
 #include "Model.h"
 #include "Utils/Filter.h"
+#include <Complementary.h>
 
 namespace Espfc::Control {
 
@@ -14,84 +15,34 @@ public:
   {
     _model.state.altitude.height = 0.0f;
     _model.state.altitude.vario = 0.0f;
-    _estHeight = 0.0f;
-    _estVario = 0.0f;
-    _lastBaroAlt = 0.0f;
-    _initialized = false;
+
+    _altitudeFilter.begin(FilterConfig(FILTER_PT3, 5), _model.state.accel.timer.rate);
+    _varioFilter.begin(FilterConfig(FILTER_PT3, 5), _model.state.accel.timer.rate);
+    _varioFusion.begin(_model.state.accel.timer.rate, _model.config.altHold.baroTau * 0.1f);
+
     return 1;
   }
 
   int update()
   {
-    float dt = 1.0f / _model.state.accel.timer.rate;
-    float baroAlt = _model.state.baro.altitudeGround;
+    Utils::Stats::Measure measure(_model.state.stats, COUNTER_IMU_FUSION2);
 
-    // Wait until barometer calibration completes to prevent locking in startup offset
-    if (_model.state.baro.altitudeBiasSamples >= 0)
+    // upsampling filter to match imu rate
+    auto baroAlt = _altitudeFilter.update(_model.state.baro.altitudeGround);
+    auto baroVario = _varioFilter.update(_model.state.baro.vario);
+
+    // complementary filter to fuse baro and accel
+    auto accZ = _model.state.accel.world.z;
+    _model.state.altitude.vario = _varioFusion.update(accZ, baroVario);
+    _model.state.altitude.height = baroAlt;
+
+    if (_model.config.debug.mode == DEBUG_ALTITUDE)
     {
-      _estHeight = 0.0f;
-      _estVario = 0.0f;
-      _lastBaroAlt = baroAlt;
-      _initialized = false;
-
-      _model.state.altitude.height = _estHeight;
-      _model.state.altitude.vario = _estVario;
-      return 1;
-    }
-
-    if (!_initialized)
-    {
-      _estHeight = baroAlt;
-      _estVario = _model.state.baro.vario;
-      _lastBaroAlt = baroAlt;
-      _initialized = true;
-    }
-
-    // Get linear vertical acceleration in world frame
-    const Quaternion& q = _model.state.attitude.quaternion;
-    VectorFloat accelBody = _model.state.accel.adc;
-    VectorFloat accelWorld = accelBody.getRotated(q);
-    
-    // Z acceleration minus gravity (ACCEL_G) in earth frame (accelWorld.z is already in m/s^2)
-    float accelZ = accelWorld.z - ACCEL_G;
-
-    // Apply deadband to accelZ to prevent drift on table when disarmed
-    if (!_model.isModeActive(MODE_ARMED) && std::abs(accelZ) < 0.15f)
-    {
-      accelZ = 0.0f;
-    }
-
-    // Predict step
-    _estHeight += _estVario * dt + 0.5f * accelZ * dt * dt;
-    _estVario += accelZ * dt;
-
-    // If new baro reading, apply 2nd-order complementary filter correction
-    if (baroAlt != _lastBaroAlt)
-    {
-      float errorHeight = baroAlt - _estHeight;
-      _lastBaroAlt = baroAlt;
-
-      // Use the actual barometer update rate for the correction step
-      float baro_dt = 1.0f / _model.state.baro.rate;
-
-      // Time constant (tau = 1.5 seconds) for complementary filter
-      float tau = 1.5f; 
-      float k1 = baro_dt / tau;
-      float k2 = baro_dt / (tau * tau);
-
-      _estHeight += k1 * errorHeight;
-      _estVario += k2 * errorHeight;
-    }
-
-    _model.state.altitude.height = _estHeight;
-    _model.state.altitude.vario = _estVario;
-
-    if(_model.config.debug.mode == DEBUG_ALTITUDE)
-    {
-      _model.state.debug[0] = std::clamp(lrintf(_model.state.baro.altitudeGround * 100.0f), -32000l, 32000l);  // baro raw cm
-      _model.state.debug[1] = std::clamp(lrintf(_model.state.baro.vario * 100.0f), -32000l, 32000l);           // baro vario cm/s
-      _model.state.debug[2] = std::clamp(lrintf(_model.state.altitude.height * 100.0f), -32000l, 32000l);      // fused height cm
-      _model.state.debug[3] = std::clamp(lrintf(_model.state.altitude.vario * 100.0f), -32000l, 32000l);       // fused vario cm/s
+      _model.state.debug[0] =
+          std::clamp(lrintf(_model.state.baro.altitudeGround * 100.0f), -32000l, 32000l);                 // gps trust
+      _model.state.debug[1] = std::clamp(lrintf(_model.state.baro.vario * 100.0f), -32000l, 32000l);      // baroAlt cm
+      _model.state.debug[2] = std::clamp(lrintf(_model.state.altitude.height * 100.0f), -32000l, 32000l); // gpsAlt cm
+      _model.state.debug[3] = std::clamp(lrintf(_model.state.altitude.vario * 100.0f), -32000l, 32000l);  // vario
     }
 
     return 1;
@@ -99,10 +50,9 @@ public:
 
 private:
   Model& _model;
-  float _estHeight;
-  float _estVario;
-  float _lastBaroAlt;
-  bool _initialized;
+  Utils::Filter _altitudeFilter;
+  Utils::Filter _varioFilter;
+  Complementary _varioFusion;
 };
 
-}
+} // namespace Espfc::Control
