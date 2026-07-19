@@ -373,9 +373,9 @@ void Controller::beginAltHold()
   pid.Ki = (float)pc.I * VEL_ITERM_SCALE;
   pid.Kd = (float)pc.D * VEL_DTERM_SCALE;
   pid.Kf = (float)pc.F * VEL_FTERM_SCALE;
-  pid.iLimitLow = -1.0f + 2.0f * (itermCenter - itermRange);
-  pid.iLimitHigh = -1.0f + 2.0f * (itermCenter + itermRange);
-  pid.iReset = pid.iLimitLow;
+  pid.iLimitLow = -0.9f;
+  pid.iLimitHigh = 0.9f;
+  pid.iReset = -0.5f;
   pid.rate = _model.state.loopTimer.rate;
   pid.dtermFilter.begin(FilterConfig(FILTER_PT1, 10), _model.state.loopTimer.rate);
   pid.ftermDerivative = false;
