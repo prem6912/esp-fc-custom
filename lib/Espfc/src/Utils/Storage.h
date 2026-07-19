@@ -32,7 +32,7 @@ class Storage
 
   private:
     static constexpr uint8_t EEPROM_MAGIC   = 0xA6;
-    static constexpr uint8_t EEPROM_VERSION = 0x01;
+    static constexpr uint8_t EEPROM_VERSION = 0x02;
     static constexpr size_t  EEPROM_SIZE    = 2048;
 };
 
