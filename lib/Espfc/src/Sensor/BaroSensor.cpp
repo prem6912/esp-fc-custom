@@ -125,6 +125,11 @@ void BaroSensor::updateAltitude()
     _model.logger.info().log("BARO BIAS").logln(baro.altitudeBias);
     baro.altitudeBiasSamples--;
   }
+  else if (!_model.isModeActive(MODE_ARMED))
+  {
+    // Slowly track ground drift when disarmed to keep ground altitude near 0
+    baro.altitudeBias += (altitude - baro.altitudeBias) * (_biasAlpha * 0.05f);
+  }
 
   baro.altitudeGround = altitude - baro.altitudeBias;
   baro.altitude = altitude;
