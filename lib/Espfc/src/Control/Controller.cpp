@@ -4,7 +4,7 @@
 
 namespace Espfc::Control {
 
-Controller::Controller(Model& model): _model(model), _rates{}, _altHoldLatched(false), _altHoldTarget(0.0f) {}
+Controller::Controller(Model& model): _model(model), _rates{}, _altHoldLatched(false), _altHoldTarget(0.0f), _hoverThrottle(0.0f), _altHoldActivePrev(false) {}
 
 int Controller::begin()
 {
@@ -145,13 +145,15 @@ void FAST_CODE_ATTR Controller::outerLoop()
   _model.state.setpoint.rate[AXIS_YAW] = calculateSetpointRate(AXIS_YAW, _model.state.input.ch[AXIS_YAW]);
 
   // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.8f)
+  bool altHoldActive = _model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.9f;
+  if (altHoldActive)
   {
     _model.state.setpoint.rate[AXIS_THRUST] = calcualteAltHoldSetpoint();
   }
   else
   {
     _model.state.setpoint.rate[AXIS_THRUST] = _model.state.input.ch[AXIS_THRUST];
+    _altHoldActivePrev = false;
   }
 
   // debug
@@ -180,7 +182,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   }
 
   // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.8f)
+  if (_model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.9f)
   {
     float thrust = innerPid[AXIS_THRUST].update(setpoint.rate[AXIS_THRUST], altitude.vario);
     float cosTheta = _model.state.attitude.cosTheta;
@@ -221,27 +223,39 @@ void FAST_CODE_ATTR Controller::innerLoop()
 
 float Controller::calcualteAltHoldSetpoint()
 {
-  float thrust = _model.state.input.ch[AXIS_THRUST];
+  bool altHoldActive = _model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.9f;
 
-  thrust = Utils::deadband(thrust, 0.1f); // +/- 10% deadband
+  if (altHoldActive && !_altHoldActivePrev)
+  {
+    _hoverThrottle = _model.state.input.ch[AXIS_THRUST];
+    // Keep hover throttle in a sane range (10% to 65% throttle)
+    _hoverThrottle = std::clamp(_hoverThrottle, -0.8f, 0.3f);
+    _altHoldLatched = false;
+  }
+  _altHoldActivePrev = altHoldActive;
+
+  float thrust = _model.state.input.ch[AXIS_THRUST] - _hoverThrottle;
+
+  thrust = Utils::deadband(thrust, 0.15f); // +/- 15% deadband around hover throttle
 
   if (thrust != 0.0f)
   {
     // stick commands climb/descend directly; target re-latches on release
     _altHoldLatched = false;
     _model.state.innerPid[AXIS_THRUST].iTerm = _model.state.input.ch[AXIS_THRUST];
-    return Utils::map3(thrust, -1.f, 0.f, 1.f, -1.0f, 0.f, 1.0f); // climb/descend rate max 1.0 m/s
+    return thrust * 1.5f; // manual override climb/descend speed setpoint
   }
 
   if (!_altHoldLatched)
   {
     _altHoldTarget = _model.state.altitude.height;
+    _model.state.innerPid[AXIS_THRUST].iTerm = _hoverThrottle; // reset I-term to hover throttle baseline
     _altHoldLatched = true;
   }
 
-  // position P: height error -> climb-rate setpoint, gentle and clamped
+  // position P: height error -> climb-rate setpoint
   const float error = _altHoldTarget - _model.state.altitude.height;
-  return std::clamp(error * 1.0f, -0.5f, 0.5f); // Kp_pos = 1.0 (m/s per m)
+  return std::clamp(error * 1.5f, -1.0f, 1.0f); // Kp_pos = 1.5
 }
 
 float Controller::getTpaFactor() const

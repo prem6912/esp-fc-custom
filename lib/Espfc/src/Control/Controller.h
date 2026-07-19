@@ -33,6 +33,8 @@ private:
   Utils::Filter _speedFilter;
   bool _altHoldLatched;
   float _altHoldTarget;
+  float _hoverThrottle;
+  bool _altHoldActivePrev;
 };
 
 } // namespace Espfc::Control
