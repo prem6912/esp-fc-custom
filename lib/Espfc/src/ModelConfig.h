@@ -722,7 +722,7 @@ class ModelConfig
       [FC_PID_NAVR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // NAV_P * 10, NAV_I * 100, NAV_D * 1000
       [FC_PID_LEVEL] = { .P = 45, .I =  0, .D =  0, .F =  0 },  // ANGLE/LEVEL
       [FC_PID_MAG]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // MAG
-      [FC_PID_VEL]   = { .P = 150, .I = 100, .D = 0, .F = 0 },  // ALTHOLD VEL
+      [FC_PID_VEL]   = { .P = 80, .I = 60, .D = 40, .F = 20 },  // ALTHOLD VEL
     };
     YawConfig yaw;
     LevelConfig level;
