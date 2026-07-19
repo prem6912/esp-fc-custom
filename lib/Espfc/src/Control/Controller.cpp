@@ -4,7 +4,7 @@
 
 namespace Espfc::Control {
 
-Controller::Controller(Model& model): _model(model), _rates{} {}
+Controller::Controller(Model& model): _model(model), _rates{}, _altHoldLatched(false), _altHoldTarget(0.0f) {}
 
 int Controller::begin()
 {
@@ -194,6 +194,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
     // follow iTerm from rc input for smooth mid-air transition
     innerPid[AXIS_THRUST].iTerm = _model.state.input.ch[AXIS_THRUST];
     output.ch[AXIS_THRUST] = setpoint.rate[AXIS_THRUST];
+    _altHoldLatched = false;
   }
 
   if (_model.config.debug.mode == DEBUG_STACK)
@@ -218,15 +219,28 @@ void FAST_CODE_ATTR Controller::innerLoop()
   }
 }
 
-float Controller::calcualteAltHoldSetpoint() const
+float Controller::calcualteAltHoldSetpoint()
 {
   float thrust = _model.state.input.ch[AXIS_THRUST];
 
-  // if(_model.isThrottleLow()) thrust = 0.0f; // stick below min check, no command
+  thrust = Utils::deadband(thrust, 0.1f); // +/- 10% deadband
 
-  thrust = Utils::deadband(thrust, 0.1f); // +/- 12.5% deadband
+  if (thrust != 0.0f)
+  {
+    // stick commands climb/descend directly; target re-latches on release
+    _altHoldLatched = false;
+    return Utils::map3(thrust, -1.f, 0.f, 1.f, -1.0f, 0.f, 1.0f); // climb/descend rate max 1.0 m/s
+  }
 
-  return Utils::map3(thrust, -1.f, 0.f, 1.f, -2.0f, 0.f, 4.f); // climb rate 5ms, descend rate 2 m/s
+  if (!_altHoldLatched)
+  {
+    _altHoldTarget = _model.state.altitude.height;
+    _altHoldLatched = true;
+  }
+
+  // position P: height error -> climb-rate setpoint, gentle and clamped
+  const float error = _altHoldTarget - _model.state.altitude.height;
+  return std::clamp(error * 1.0f, -0.5f, 0.5f); // Kp_pos = 1.0 (m/s per m)
 }
 
 float Controller::getTpaFactor() const

@@ -26,6 +26,19 @@ public:
     float dt = 1.0f / _model.state.accel.timer.rate;
     float baroAlt = _model.state.baro.altitudeGround;
 
+    // Wait until barometer calibration completes to prevent locking in startup offset
+    if (_model.state.baro.altitudeBiasSamples >= 0)
+    {
+      _estHeight = 0.0f;
+      _estVario = 0.0f;
+      _lastBaroAlt = baroAlt;
+      _initialized = false;
+
+      _model.state.altitude.height = _estHeight;
+      _model.state.altitude.vario = _estVario;
+      return 1;
+    }
+
     if (!_initialized)
     {
       _estHeight = baroAlt;
@@ -37,13 +50,13 @@ public:
     // Get linear vertical acceleration in world frame
     const Quaternion& q = _model.state.attitude.quaternion;
     VectorFloat accelBody = _model.state.accel.adc;
-    VectorFloat accelWorld = accelBody.getRotated(q.getConjugate());
+    VectorFloat accelWorld = accelBody.getRotated(q);
     
-    // Z acceleration minus gravity (1.0G) in earth frame
-    float accelZ = (accelWorld.z - 1.0f) * ACCEL_G;
+    // Z acceleration minus gravity (ACCEL_G) in earth frame (accelWorld.z is already in m/s^2)
+    float accelZ = accelWorld.z - ACCEL_G;
 
-    // Apply deadband to accelZ to prevent drift on table
-    if (std::abs(accelZ) < 0.15f)
+    // Apply deadband to accelZ to prevent drift on table when disarmed
+    if (!_model.isModeActive(MODE_ARMED) && std::abs(accelZ) < 0.15f)
     {
       accelZ = 0.0f;
     }
@@ -52,16 +65,19 @@ public:
     _estHeight += _estVario * dt + 0.5f * accelZ * dt * dt;
     _estVario += accelZ * dt;
 
-    // If new baro reading, apply correction
+    // If new baro reading, apply 2nd-order complementary filter correction
     if (baroAlt != _lastBaroAlt)
     {
       float errorHeight = baroAlt - _estHeight;
       _lastBaroAlt = baroAlt;
 
-      // Time constant (tau = 1.0 seconds) for complementary filter
-      float tau = 1.0f; 
-      float k1 = dt / tau;
-      float k2 = dt / (tau * tau);
+      // Use the actual barometer update rate for the correction step
+      float baro_dt = 1.0f / _model.state.baro.rate;
+
+      // Time constant (tau = 1.5 seconds) for complementary filter
+      float tau = 1.5f; 
+      float k1 = baro_dt / tau;
+      float k2 = baro_dt / (tau * tau);
 
       _estHeight += k1 * errorHeight;
       _estVario += k2 * errorHeight;

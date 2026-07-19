@@ -21,7 +21,7 @@ public:
   inline float getTpaFactor() const;
   inline void resetIterm();
   float calculateSetpointRate(int axis, float input) const;
-  float calcualteAltHoldSetpoint() const;
+  float calcualteAltHoldSetpoint();
 
 private:
   void beginAltHold();
@@ -31,6 +31,8 @@ private:
   Model& _model;
   Rates _rates;
   Utils::Filter _speedFilter;
+  bool _altHoldLatched;
+  float _altHoldTarget;
 };
 
 } // namespace Espfc::Control
