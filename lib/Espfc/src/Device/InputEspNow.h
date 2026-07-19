@@ -9,12 +9,14 @@
 
 namespace Espfc {
 
+class Model;
+
 namespace Device {
 
 class InputEspNow: public InputDevice
 {
 public:
-  int begin(void);
+  int begin(Model *model = nullptr);
   InputStatus update() override;
   uint16_t get(uint8_t i) const override;
   void get(uint16_t * data, size_t len) const override;
@@ -22,6 +24,7 @@ public:
   bool needAverage() const override;
 
 private:
+  Model * _model = nullptr;
   EspNowRcLink::Receiver _rx;
   static constexpr size_t CHANNELS = EspNowRcLink::RC_CHANNEL_MAX + 1;
   uint16_t _channels[CHANNELS];

@@ -12,11 +12,10 @@
 #define ESPFC_INPUT_PIN 6 // ppm
 
 #define ESPFC_OUTPUT_COUNT 4
-#define ESPFC_OUTPUT_0 39
-#define ESPFC_OUTPUT_1 40
-#define ESPFC_OUTPUT_2 41
-#define ESPFC_OUTPUT_3 42
-
+#define ESPFC_OUTPUT_0 46
+#define ESPFC_OUTPUT_1 47
+#define ESPFC_OUTPUT_2 42
+#define ESPFC_OUTPUT_3 48
 #define ESPFC_SERIAL_0
 #define ESPFC_SERIAL_0_DEV Serial0
 #define ESPFC_SERIAL_0_DEV_T HardwareSerial
@@ -67,8 +66,8 @@
 #define ESPFC_SPI_CS_BARO 7
 
 #define ESPFC_I2C_0
-#define ESPFC_I2C_0_SCL 10
-#define ESPFC_I2C_0_SDA 9
+#define ESPFC_I2C_0_SCL 2
+#define ESPFC_I2C_0_SDA 1
 #define ESPFC_I2C_0_SOFT
 
 #define ESPFC_BUZZER_PIN 5
@@ -76,7 +75,7 @@
 #define ESPFC_LED_PIN -1
 
 #define ESPFC_ADC_0
-#define ESPFC_ADC_0_PIN 1
+#define ESPFC_ADC_0_PIN -1
 
 #define ESPFC_ADC_1
 #define ESPFC_ADC_1_PIN 4

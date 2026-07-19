@@ -64,12 +64,12 @@ int VoltageSensor::readVbat()
   // cell count detection
   if (_model.state.battery.samples > 0)
   {
-    _model.state.battery.cells = std::ceil(_model.state.battery.voltage / 4.2f);
+    _model.state.battery.cells = std::ceil(_model.state.battery.voltage / (_model.config.cellMax * 0.01f));
     _model.state.battery.samples--;
   }
 
   _model.state.battery.cellVoltage = _model.state.battery.voltage / constrain(_model.state.battery.cells, 1, 6);
-  _model.state.battery.percentage = Utils::clamp(Utils::map(_model.state.battery.cellVoltage, 3.4f, 4.2f, 0.0f, 100.0f), 0.0f, 100.0f);
+  _model.state.battery.percentage = Utils::clamp(Utils::map(_model.state.battery.cellVoltage, _model.config.cellMin * 0.01f, _model.config.cellMax * 0.01f, 0.0f, 100.0f), 0.0f, 100.0f);
 
   if (_model.config.debug.mode == DEBUG_BATTERY)
   {
@@ -85,7 +85,7 @@ int VoltageSensor::readVbat()
 int VoltageSensor::readIbat()
 {
 #ifdef ESPFC_ADC_1
-  if (_model.config.ibat.source != 1 && _model.config.pin[PIN_INPUT_ADC_1] == -1) return 0;
+  if (_model.config.ibat.source != 1 || _model.config.pin[PIN_INPUT_ADC_1] == -1) return 0;
 
   _model.state.battery.rawCurrent = analogRead(_model.config.pin[PIN_INPUT_ADC_1]);
   float volts = _iFilterFast.update(_model.state.battery.rawCurrent * ESPFC_ADC_SCALE);

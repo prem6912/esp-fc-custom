@@ -369,7 +369,7 @@ Device::InputDevice * Input::getInputDevice()
 #if defined(ESPFC_ESPNOW)
   else if(_model.isFeatureActive(FEATURE_RX_SPI))
   {
-    int status = _espnow.begin();
+    int status = _espnow.begin(&_model);
     _model.logger.info().log(F("RX ESPNOW")).logln(status);
     return &_espnow;
   }

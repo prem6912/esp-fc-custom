@@ -1,4 +1,8 @@
 #include <Arduino.h>
+#ifdef ESP32
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#endif
 #include <Wire.h>
 #include <SPI.h>
 #include <EEPROM.h>
@@ -86,6 +90,7 @@ Espfc::Espfc espfc;
 
     void setup()
     {
+      WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout detector
       disableCore0WDT();
       // internal task priorities
       // PRO(0): hi-res timer(22), timer(1), event-loop(20), lwip(18/any), wifi(23), wpa(2/any), BT/vhci(23), NimBle(21), BT/other(19,20,22), Eth(15), Mqtt(5/any)

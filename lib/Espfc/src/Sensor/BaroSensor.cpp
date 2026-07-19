@@ -19,10 +19,15 @@ int BaroSensor::begin()
   const auto internalFilter = FILTER_PT1;
   const auto internalCutoff = std::max((rate + 4) / 8, 1);
 
+  // Use user-configurable filter for altitude and vario (baro_lpf_type / baro_lpf_freq)
+  const auto& userFilter = _model.config.baro.filter;
+  const FilterType altFilter = (userFilter.freq > 0) ? (FilterType)userFilter.type : internalFilter;
+  const auto altCutoff = (userFilter.freq > 0) ? (int)userFilter.freq : internalCutoff;
+
   _temperatureFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
   _pressureFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
-  _altitudeFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
-  _varioFilter.begin(FilterConfig(internalFilter, internalCutoff), rate);
+  _altitudeFilter.begin(FilterConfig(altFilter, altCutoff), rate);
+  _varioFilter.begin(FilterConfig(altFilter, altCutoff), rate);
 
   _temperatureMedianFilter.begin(FilterConfig(FILTER_MEDIAN3, 0), rate);
   _pressureMedianFilter.begin(FilterConfig(FILTER_MEDIAN3, 0), rate);
@@ -107,7 +112,7 @@ void BaroSensor::readTemperature()
 void BaroSensor::readPressure()
 {
   float press = _model.state.baro.pressureRaw = _baro->readPressure();
-  // press = _pressureMedianFilter.update(press);
+  press = _pressureMedianFilter.update(press);
   _model.state.baro.pressure = _pressureFilter.update(press);
 }
 

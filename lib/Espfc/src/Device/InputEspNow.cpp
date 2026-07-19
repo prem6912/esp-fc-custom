@@ -2,13 +2,15 @@
 
 #include "InputEspNow.h"
 #include "Utils/MemoryHelper.h"
+#include "Model.h"
 
 namespace Espfc {
 
 namespace Device {
 
-int InputEspNow::begin(void)
+int InputEspNow::begin(Model *model)
 {
+  _model = model;
   for(size_t i = 0; i < CHANNELS; i++)
   {
     _channels[i] = i == 2 ? 1000 : 1500;
@@ -18,6 +20,14 @@ int InputEspNow::begin(void)
 
 InputStatus FAST_CODE_ATTR InputEspNow::update()
 {
+  if (_model)
+  {
+    _rx.setSensor(0, (int16_t)round(_model->state.battery.voltage * 100.0f));
+    _rx.setSensor(1, (int16_t)round(_model->state.battery.cellVoltage * 100.0f));
+    _rx.setSensor(2, (int8_t)round(_model->state.battery.percentage));
+    _rx.setSensor(3, (int8_t)_model->state.battery.cells);
+  }
+
   _rx.update();
   if(_rx.available())
   {

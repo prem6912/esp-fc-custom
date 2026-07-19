@@ -453,6 +453,8 @@ const Cli::Param * Cli::initialize(ModelConfig& c)
     Param(PSTR("vbat_scale"), &c.vbat.scale),
     Param(PSTR("vbat_mul"), &c.vbat.resMult),
     Param(PSTR("vbat_div"), &c.vbat.resDiv),
+    Param(PSTR("vbat_cell_min"), &c.cellMin),
+    Param(PSTR("vbat_cell_max"), &c.cellMax),
     Param(PSTR("vbat_cell_warn"), &c.vbat.cellWarning),
 
     Param(PSTR("ibat_source"), &c.ibat.source, currentSourceChoices),
