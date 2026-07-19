@@ -183,6 +183,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   if (_model.isModeActive(MODE_ALTHOLD))
   {
     float thrust = innerPid[AXIS_THRUST].update(setpoint.rate[AXIS_THRUST], altitude.vario);
+    float cosTheta = _model.state.attitude.cosTheta;
     cosTheta = std::max(cosTheta, 0.77f); // Limit maximum boost to 1.3x
     thrust = (thrust + 1.0f) / cosTheta - 1.0f;
     output.ch[AXIS_THRUST] = std::max(-1.0f, std::min(1.0f, thrust));
