@@ -145,7 +145,7 @@ void FAST_CODE_ATTR Controller::outerLoop()
   _model.state.setpoint.rate[AXIS_YAW] = calculateSetpointRate(AXIS_YAW, _model.state.input.ch[AXIS_YAW]);
 
   // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD))
+  if (_model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.8f)
   {
     _model.state.setpoint.rate[AXIS_THRUST] = calcualteAltHoldSetpoint();
   }
@@ -180,7 +180,7 @@ void FAST_CODE_ATTR Controller::innerLoop()
   }
 
   // thrust control
-  if (_model.isModeActive(MODE_ALTHOLD))
+  if (_model.isModeActive(MODE_ALTHOLD) && _model.state.input.ch[AXIS_THRUST] >= -0.8f)
   {
     float thrust = innerPid[AXIS_THRUST].update(setpoint.rate[AXIS_THRUST], altitude.vario);
     float cosTheta = _model.state.attitude.cosTheta;
