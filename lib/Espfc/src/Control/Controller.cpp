@@ -229,6 +229,7 @@ float Controller::calcualteAltHoldSetpoint()
   {
     // stick commands climb/descend directly; target re-latches on release
     _altHoldLatched = false;
+    _model.state.innerPid[AXIS_THRUST].iTerm = _model.state.input.ch[AXIS_THRUST];
     return Utils::map3(thrust, -1.f, 0.f, 1.f, -1.0f, 0.f, 1.0f); // climb/descend rate max 1.0 m/s
   }
 
