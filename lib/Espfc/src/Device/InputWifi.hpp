@@ -10,6 +10,7 @@
 #ifdef ESP32
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
+#include "esp_wifi.h"
 #endif
 
 namespace Espfc::Device {
@@ -857,9 +858,12 @@ public:
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Disable brownout detector
 #endif
     WiFi.mode(WIFI_AP);
-    WiFi.setSleep(false);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Full Wi-Fi TX power for maximum link reliability
-    WiFi.softAP(ssid, pass);
+    WiFi.softAP(ssid, pass, 6); // Host SoftAP on Channel 6
+    WiFi.setSleep(false);        // Radio power save off (continuous RX/TX)
+    WiFi.setTxPower(WIFI_POWER_19_5dBm); // Set +19.5 dBm AFTER AP starts so AP_STARTED_BIT is active
+#ifdef ESP32
+    esp_wifi_set_max_tx_power(80); // Set absolute hardware maximum 20.0 dBm
+#endif
     _udp.begin(udpPort);
 
     // Setup HTTP Web Server on port 80
