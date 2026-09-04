@@ -131,10 +131,10 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
   }
   .pid-modal.open { bottom: 0; }
   .pid-box { 
-    padding: 10px 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px;
+    padding: 10px 12px; overflow-y: auto; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px;
     touch-action: pan-y !important; -webkit-overflow-scrolling: touch;
   }
-  .pid-hdr { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 6px; font-size: 0.85rem; font-weight: 700; }
+  .pid-hdr { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 6px; font-size: 0.85rem; font-weight: 700; flex: 0 0 auto; }
   
   .pid-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .pid-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
