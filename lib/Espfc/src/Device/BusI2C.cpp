@@ -31,26 +31,34 @@ int8_t FAST_CODE_ATTR BusI2C::read(uint8_t devAddr, uint8_t regAddr, uint8_t len
   int8_t count = 0;
   uint32_t t1 = millis();
 
-  //D("i2c:r0", devAddr, regAddr, length);
-
   _dev.beginTransmission(devAddr);
   _dev.write(regAddr);
-  _dev.endTransmission();
-  _dev.requestFrom(devAddr, length);
-
-  for (; _dev.available() && (_timeout == 0 || millis() - t1 < _timeout); count++)
+  uint8_t status = _dev.endTransmission(false);
+  if (status != 0)
   {
-    data[count] = _dev.read();
-    //D("i2c:r1", count, data[count]);
+    if(onError) onError();
+    return -1;
   }
 
-  //D("i2c:r3", length, count);
+  uint8_t available = _dev.requestFrom(devAddr, length);
+  if (available == 0)
+  {
+    if(onError) onError();
+    return -1;
+  }
+
+  for (; _dev.available() && (_timeout == 0 || millis() - t1 < _timeout) && count < length; count++)
+  {
+    data[count] = _dev.read();
+  }
+
   if (_timeout > 0 && millis() - t1 >= _timeout && count < length) count = -1; // timeout
 
   if(onError && count != length) onError();
 
   return count;
 }
+
 
 bool BusI2C::write(uint8_t devAddr, uint8_t regAddr, uint8_t length, const uint8_t* data)
 {

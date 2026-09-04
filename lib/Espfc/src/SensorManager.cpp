@@ -26,24 +26,23 @@ int FAST_CODE_ATTR SensorManager::read()
 {
   _gyro.read();
 
-  if(_model.state.loopTimer.syncTo(_model.state.gyro.timer))
-  {
-    _model.state.appQueue.send(Event(EVENT_GYRO_READ));
-  }
-
   if(_model.state.accel.timer.syncTo(_model.state.gyro.timer))
   {
     _accel.update();
-    _model.state.appQueue.send(Event(EVENT_ACCEL_READ));
+    fusion(); // Calculate 3D orientation fusion immediately without queue latency
     _model.state.mode.button = _button.update();
     return 1;
   }
+
+
+  if(_voltage.update()) return 1;
+
+  if(_altitude.read()) return 1;
 
   if(_mag.update()) return 1;
 
   if(_baro.update()) return 1;
 
-  if(_voltage.update()) return 1;
 
   return 0;
 }

@@ -22,13 +22,16 @@ public:
   void get(uint16_t * data, size_t len) const override;
   size_t getChannelCount() const override;
   bool needAverage() const override;
+  void setWifiFallback(InputDevice* wifi) { _wifi = wifi; }
 
 private:
   Model * _model = nullptr;
+  InputDevice * _wifi = nullptr;
   EspNowRcLink::Receiver _rx;
   static constexpr size_t CHANNELS = EspNowRcLink::RC_CHANNEL_MAX + 1;
   uint16_t _channels[CHANNELS];
 };
+
 
 }
 

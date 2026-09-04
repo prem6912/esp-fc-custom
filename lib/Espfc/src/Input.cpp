@@ -9,6 +9,7 @@ Input::Input(Model& model, TelemetryManager& telemetry): _model(model), _telemet
 
 int Input::begin()
 {
+  _wifi.setModel(&_model);
   _device = getInputDevice();
   _model.state.input.channelCount = _device ? _device->getChannelCount() : INPUT_CHANNELS;
   _model.state.input.frameDelta = FRAME_TIME_DEFAULT_US;
@@ -366,16 +367,15 @@ Device::InputDevice * Input::getInputDevice()
     _model.logger.info().log(F("RX PPM")).log(_model.config.pin[PIN_INPUT_RX]).logln(_model.config.input.ppmMode);
     return &_ppm;
   }
-#if defined(ESPFC_ESPNOW)
-  else if(_model.isFeatureActive(FEATURE_RX_SPI))
-  {
-    int status = _espnow.begin(&_model);
-    _model.logger.info().log(F("RX ESPNOW")).logln(status);
-    return &_espnow;
-  }
-#endif
 
-  return nullptr;
+  // Pure Wi-Fi AP Web Cockpit (http://192.168.4.1) + UDP (port 8888)
+  _wifi.begin("ESP32-DRONE", "12345678", 8888);
+  _model.logger.info().logln(F("RX WIFI AP (192.168.4.1)"));
+  return &_wifi;
 }
+
+
+
+
 
 }

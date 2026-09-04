@@ -209,23 +209,21 @@ void FAST_CODE_IMU_ATTR Mahony::update(float gx, float gy, float gz, float ax, f
 
 		// Compute and apply integral feedback if enabled
 		if(twoKi > 0.0f) {
-			// integral error scaled by Ki
+			// integral error scaled by Ki (Roll and Pitch only, gravity has no Yaw observability)
 			integralFBx += twoKi * halfex * invSampleFreq;
 			integralFBy += twoKi * halfey * invSampleFreq;
-			integralFBz += twoKi * halfez * invSampleFreq;
+			integralFBz = 0.0f; // Prevent false Z drift in 6-DOF mode
 			gx += integralFBx;	// apply integral feedback
 			gy += integralFBy;
-			gz += integralFBz;
 		} else {
 			integralFBx = 0.0f;	// prevent integral windup
 			integralFBy = 0.0f;
 			integralFBz = 0.0f;
 		}
 
-		// Apply proportional feedback
+		// Apply proportional feedback (Roll and Pitch only)
 		gx += twoKp * halfex;
 		gy += twoKp * halfey;
-		gz += twoKp * halfez;
 	}
 
 	// Integrate rate of change of quaternion

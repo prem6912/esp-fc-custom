@@ -13,11 +13,12 @@ int VoltageSensor::begin()
   _model.state.battery.timer.setRate(100);
   _model.state.battery.samples = 50;
 
-  _vFilterFast.begin(FilterConfig(FILTER_PT1, 20), _model.state.battery.timer.rate);
-  _vFilter.begin(FilterConfig(FILTER_PT2, 2), _model.state.battery.timer.rate);
+  // 50Hz effective sampling rate per channel (VBAT/IBAT alternating)
+  _vFilterFast.begin(FilterConfig(FILTER_PT1, 10), 50);
+  _vFilter.begin(FilterConfig(FILTER_PT2, 1), 50);
 
-  _iFilterFast.begin(FilterConfig(FILTER_PT1, 20), _model.state.battery.timer.rate);
-  _iFilter.begin(FilterConfig(FILTER_PT2, 2), _model.state.battery.timer.rate);
+  _iFilterFast.begin(FilterConfig(FILTER_PT1, 10), 50);
+  _iFilter.begin(FilterConfig(FILTER_PT2, 1), 50);
 
   _state = VBAT;
 
@@ -47,12 +48,17 @@ int VoltageSensor::readVbat()
 {
 #ifdef ESPFC_ADC_0
   if (_model.config.vbat.source != 1 || _model.config.pin[PIN_INPUT_ADC_0] == -1) return 0;
-  // wemos d1 mini has divider 3.2:1 (220k:100k)
-  // additionaly I've used divider 5.7:1 (4k7:1k)
-  // total should equals ~18.24:1, 73:4 resDiv:resMult should be ideal,
-  // but ~52:1 is real, did I miss something?
-  _model.state.battery.rawVoltage = analogRead(_model.config.pin[PIN_INPUT_ADC_0]);
-  float volts = _vFilterFast.update(_model.state.battery.rawVoltage * ESPFC_ADC_SCALE);
+
+  // 16-sample oversampling to eliminate ESP32 ADC thermal noise & WiFi RF transmission bursts
+  uint32_t adcSum = 0;
+  int pin = _model.config.pin[PIN_INPUT_ADC_0];
+  for (int i = 0; i < 16; ++i)
+  {
+    adcSum += analogRead(pin);
+  }
+  _model.state.battery.rawVoltage = adcSum / 16;
+
+  float volts = _vFilterFast.update((float)_model.state.battery.rawVoltage * ESPFC_ADC_SCALE);
 
   volts *= _model.config.vbat.scale * 0.1f;
   volts *= _model.config.vbat.resMult;
@@ -87,8 +93,15 @@ int VoltageSensor::readIbat()
 #ifdef ESPFC_ADC_1
   if (_model.config.ibat.source != 1 || _model.config.pin[PIN_INPUT_ADC_1] == -1) return 0;
 
-  _model.state.battery.rawCurrent = analogRead(_model.config.pin[PIN_INPUT_ADC_1]);
-  float volts = _iFilterFast.update(_model.state.battery.rawCurrent * ESPFC_ADC_SCALE);
+  uint32_t adcSum = 0;
+  int pin = _model.config.pin[PIN_INPUT_ADC_1];
+  for (int i = 0; i < 16; ++i)
+  {
+    adcSum += analogRead(pin);
+  }
+  _model.state.battery.rawCurrent = adcSum / 16;
+
+  float volts = _iFilterFast.update((float)_model.state.battery.rawCurrent * ESPFC_ADC_SCALE);
   float milivolts = volts * 1000.0f;
 
   volts += _model.config.ibat.offset * 0.001f;

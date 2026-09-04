@@ -77,7 +77,7 @@ class Model
 
     bool isAirModeActive() const
     {
-      return isModeActive(MODE_AIRMODE);// || isFeatureActive(FEATURE_AIRMODE);
+      return isModeActive(MODE_AIRMODE) || isModeActive(MODE_ALTHOLD) || isFeatureActive(FEATURE_AIRMODE);
     }
 
     bool isThrottleLow() const
@@ -291,6 +291,11 @@ class Model
       begin();
     }
 
+    void reloadPids()
+    {
+      state.reloadPidPending = true;
+    }
+
     void reset()
     {
       initialize();
@@ -392,11 +397,26 @@ class Model
         config.output.motorLimit = 100;
       }
 
+      // sanitize battery voltage sensing
+      if(config.pin[PIN_INPUT_ADC_0] == -1 || config.pin[PIN_INPUT_ADC_0] == 36) {
+        config.pin[PIN_INPUT_ADC_0] = 35;
+      }
+      if(config.vbat.source == 0 || config.vbat.scale == 100 || config.vbat.scale == 112) {
+        config.vbat.source = 1;
+        config.vbat.scale = 110; // Calibrated 110 (maps 4.22V -> 4.15V match)
+        config.vbat.resMult = 2;
+        config.vbat.resDiv = 10;
+        config.vbat.cellWarning = 350;
+        config.cellMin = 330;
+        config.cellMax = 420;
+      }
+
       // configure serial ports
       constexpr uint32_t serialFunctionAllowedMask = SERIAL_FUNCTION_MSP | SERIAL_FUNCTION_RX_SERIAL | SERIAL_FUNCTION_BLACKBOX | 
         SERIAL_FUNCTION_GPS | SERIAL_FUNCTION_TELEMETRY_FRSKY | SERIAL_FUNCTION_TELEMETRY_HOTT | SERIAL_FUNCTION_TELEMETRY_IBUS | SERIAL_FUNCTION_VTX_SMARTAUDIO;
-      uint32_t featureAllowMask =  FEATURE_RX_PPM | FEATURE_RX_SERIAL | FEATURE_MOTOR_STOP | FEATURE_SOFTSERIAL | FEATURE_GPS |
+      uint32_t featureAllowMask =  FEATURE_RX_PPM | FEATURE_RX_SERIAL | FEATURE_MOTOR_STOP | FEATURE_SOFTSERIAL | FEATURE_GPS | FEATURE_SONAR |
         FEATURE_TELEMETRY | FEATURE_RX_SPI;// | FEATURE_AIRMODE;
+
 
       // allow dynamic filter only above 1k sampling rate
       if(state.loopRate >= DynamicFilterConfig::MIN_FREQ)
@@ -411,10 +431,11 @@ class Model
         config.serial[i].functionMask &= serialFunctionAllowedMask;
       }
 
-      if (config.fusion.mode >= FUSION_MAX)
+      if (config.fusion.mode <= FUSION_NONE || config.fusion.mode >= FUSION_MAX)
       {
         config.fusion.mode = FUSION_MAHONY;
       }
+
 
       // only few beeper modes allowed
       config.buzzer.beeperMask &=

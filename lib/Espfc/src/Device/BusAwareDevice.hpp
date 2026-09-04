@@ -18,6 +18,11 @@ public:
     return _bus;
   }
 
+  BusDevice* getBusDev()
+  {
+    return _bus;
+  }
+
   uint8_t getAddress() const
   {
     return _addr;

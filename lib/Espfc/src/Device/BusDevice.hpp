@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <functional>
 
-constexpr uint32_t ESPFC_BUS_TIMEOUT = 100u;
+constexpr uint32_t ESPFC_BUS_TIMEOUT = 2u;
+
 
 namespace Espfc {
 

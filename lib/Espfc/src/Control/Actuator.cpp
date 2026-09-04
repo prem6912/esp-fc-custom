@@ -149,6 +149,19 @@ void Actuator::updateModeMask()
     newMask |= (1 << MODE_FAILSAFE);
   }
 
+  // Safety Self-Leveling Fallback:
+  // If the drone is armed and accelerometer is active, guarantee ANGLE mode self-leveling
+  if ((newMask & (1 << MODE_ARMED)) && _model.accelActive())
+  {
+    newMask |= (1 << MODE_ANGLE);
+  }
+
+  // Guaranteed Altitude Hold Fallback (Web Cockpit & AUX 2 Switch):
+  if (_model.state.input.us[AXIS_AUX_2] > 1600 && (_model.state.rangefinder.present || _model.state.baro.present))
+  {
+    newMask |= (1 << MODE_ALTHOLD);
+  }
+
   for(size_t i = 0; i < MODE_COUNT; i++)
   {
     bool newVal = newMask & (1 << i);
@@ -174,7 +187,7 @@ bool Actuator::canActivateMode(FlightMode mode)
     case MODE_AIRMODE:
       return _model.state.mode.airmodeAllowed;
     case MODE_ALTHOLD:
-      return _model.state.baro.dev;
+      return _model.state.rangefinder.present || _model.state.baro.present;
     default:
       return true;
   }

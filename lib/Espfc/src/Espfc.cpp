@@ -19,7 +19,8 @@ int Espfc::load()
 
 int Espfc::begin()
 {
-  _model.state.led.begin(_model.config.pin[PIN_LED_BLINK], _model.config.led.type, _model.config.led.invert);
+  int8_t ledPin = (_model.config.pin[PIN_LED_BLINK] != -1) ? _model.config.pin[PIN_LED_BLINK] : ESPFC_LED_PIN;
+  _model.state.led.begin(ledPin, _model.config.led.type, _model.config.led.invert);
 
   _serial.begin();      // requires _model.load()
   //_model.logStorageResult();
@@ -53,14 +54,25 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
 #if defined(ESPFC_MULTI_CORE)
 
   _sensor.read();
-  if(_model.state.input.timer.syncTo(_model.state.gyro.timer, 1u))
+  _sensor.preLoop();
+  if(_model.state.loopTimer.syncTo(_model.state.gyro.timer))
   {
-    _input.update();
+    _controller.update();
+    if(_model.state.mixer.timer.syncTo(_model.state.loopTimer))
+    {
+      _mixer.update();
+    }
+    _blackbox.update();
+    if(_model.state.input.timer.syncTo(_model.state.gyro.timer, 1u))
+    {
+      _input.update();
+    }
+    if(_model.state.actuatorTimer.check())
+    {
+      _actuator.update();
+    }
   }
-  if(_model.state.actuatorTimer.check())
-  {
-    _actuator.update();
-  }
+  _sensor.postLoop();
 
 #else
 
@@ -94,44 +106,13 @@ int FAST_CODE_ATTR Espfc::update(bool externalTrigger)
   return 1;
 }
 
-// other task
+// other task (Core 0: Wi-Fi, Web Server, UDP, Telemetry)
 int FAST_CODE_ATTR Espfc::updateOther()
 {
-#if defined(ESPFC_MULTI_CORE)
-  if(_model.state.appQueue.isEmpty())
-  {
-    return 0;
-  }
-  Event e = _model.state.appQueue.receive();
-
-  Utils::Stats::Measure measure(_model.state.stats, COUNTER_CPU_1);
-
-  switch(e.type)
-  {
-    case EVENT_GYRO_READ:
-      _sensor.preLoop();
-      _controller.update();
-      // skip mixer and bb if earlier than half cycle, possible delay in previous iteration, 
-      // to keep space to receive dshot erpm frame, but process rest
-      if(_loop_next < micros())
-      {
-        _loop_next = micros() + _model.state.loopTimer.interval / 2;
-        _mixer.update();
-        _blackbox.update();
-      }
-      _sensor.postLoop();
-      break;
-    case EVENT_ACCEL_READ:
-      _sensor.fusion();
-      break;
-    default:
-      break;
-      // nothing
-  }
-#endif
-
+  _input.handleOther();
   return 1;
 }
+
 
 }
 

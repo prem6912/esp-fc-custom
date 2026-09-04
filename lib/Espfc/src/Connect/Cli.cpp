@@ -364,7 +364,10 @@ const Cli::Param * Cli::initialize(ModelConfig& c)
   static const Param params[] = {
 
     Param(PSTR("feature_gps"), &c.featureMask, 7),
+    Param(PSTR("feature_sonar"), &c.featureMask, 9),
+    Param(PSTR("feature_rangefinder"), &c.featureMask, 9),
     Param(PSTR("feature_dyn_notch"), &c.featureMask, 29),
+
     Param(PSTR("feature_motor_stop"), &c.featureMask, 4),
     Param(PSTR("feature_rx_ppm"), &c.featureMask, 0),
     Param(PSTR("feature_rx_serial"), &c.featureMask, 3),

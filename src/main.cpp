@@ -2,7 +2,19 @@
 #ifdef ESP32
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
+#include "soc/timer_group_struct.h"
+#include "soc/timer_group_reg.h"
+#include "esp_task_wdt.h"
+
+// Disable brownout detector at the absolute earliest point in C-runtime startup
+__attribute__((constructor(101))) static void disable_early_brownout(void)
+{
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+}
 #endif
+
+
+
 #include <Wire.h>
 #include <SPI.h>
 #include <EEPROM.h>
@@ -82,22 +94,36 @@ Espfc::Espfc espfc;
 
     void pidTask(void *pvParameters)
     {
+      disableCore0WDT();
+      TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
+      TIMERG0.wdt_config0.en = 0;
+      TIMERG0.wdt_wprotect = 0;
       while(true)
       {
         espfc.updateOther();
+        vTaskDelay(1);
       }
     }
 
     void setup()
     {
-      WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout detector
+      // 1. Fully disable Hardware Brownout Detector
+      WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
+      // 2. Disable Hardware Watchdogs
       disableCore0WDT();
-      // internal task priorities
-      // PRO(0): hi-res timer(22), timer(1), event-loop(20), lwip(18/any), wifi(23), wpa(2/any), BT/vhci(23), NimBle(21), BT/other(19,20,22), Eth(15), Mqtt(5/any)
-      // APP(1): free
+      TIMERG0.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
+      TIMERG0.wdt_config0.en = 0;
+      TIMERG0.wdt_wprotect = 0;
+
+      TIMERG1.wdt_wprotect = TIMG_WDT_WKEY_VALUE;
+      TIMERG1.wdt_config0.en = 0;
+      TIMERG1.wdt_wprotect = 0;
+
       espfc.load();
       xTaskCreateUniversal(gyroTask, "gyroTask", 8192, NULL, 24, &gyroTaskHandle, 1);
       xTaskCreateUniversal(pidTask,  "pidTask",  8192, NULL,  1, &pidTaskHandle,  0);
+
       vTaskDelete(NULL); // delete arduino loop task
     }
 

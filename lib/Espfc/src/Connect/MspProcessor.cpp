@@ -241,10 +241,12 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Device::SerialD
       r.writeU16(_model.state.stats.loopTime());
       r.writeU16(_model.state.i2cErrorCount); // i2c error count
       //         acc,     baro,    mag,     gps,     sonar,   gyro
-      r.writeU16(_model.accelActive() | _model.baroActive() << 1 | _model.magActive() << 2 | _model.gpsActive() << 3 | 0 << 4 | _model.gyroActive() << 5);
+      r.writeU16(_model.accelActive() | _model.baroActive() << 1 | _model.magActive() << 2 | _model.gpsActive() << 3 | (_model.state.rangefinder.present ? 1 : 0) << 4 | _model.gyroActive() << 5);
+
       r.writeU32(_model.state.mode.mask); // flight mode flags
       r.writeU8(0); // pid profile
-      r.writeU16(lrintf(_model.state.stats.getCpuLoad()));
+      r.writeU16(std::clamp((int)lrintf(_model.state.stats.getCpuLoad()), 0, 100));
+
       if (m.cmd == MSP_STATUS_EX) {
         r.writeU8(1); // max profile count
         r.writeU8(0); // current rate profile index
@@ -693,7 +695,13 @@ void MspProcessor::processCommand(MspMessage& m, MspResponse& r, Device::SerialD
     case MSP_ALTITUDE:
       r.writeU32(lrintf(_model.state.altitude.height * 100.f));  // alt [cm]
       r.writeU16(lrintf(_model.state.altitude.vario * 100.f));   // vario [cm/s]
+      r.writeU32(_model.state.rangefinder.valid ? lrintf(_model.state.rangefinder.distance * 100.f) : -1); // sonar/rangefinder alt [cm]
       break;
+
+    case 58: // MSP_SONAR_ALTITUDE
+      r.writeU32(_model.state.rangefinder.valid ? lrintf(_model.state.rangefinder.distance * 100.f) : -1);
+      break;
+
 
     case MSP_BEEPER_CONFIG:
       r.writeU32(~_model.config.buzzer.beeperMask); // beeper mask
@@ -1665,6 +1673,8 @@ bool MspProcessor::debugSkip(uint8_t cmd)
   if(cmd == MSP_ANALOG) return true;
   if(cmd == MSP_ATTITUDE) return true;
   if(cmd == MSP_ALTITUDE) return true;
+  if(cmd == 58) return true; // MSP_SONAR_ALTITUDE
+
   if(cmd == MSP_RC) return true;
   if(cmd == MSP_RAW_IMU) return true;
   if(cmd == MSP_MOTOR) return true;

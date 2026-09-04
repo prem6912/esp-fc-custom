@@ -331,6 +331,16 @@ struct ModeState
   bool isLongClickActive()   const { return button & (1 << 2); }
 };
 
+struct RangefinderState
+{
+  bool present = false;
+  bool valid = false;
+  bool fresh = false;
+  float distance = 0.0f;
+  int32_t rawMm = 0;
+  uint32_t lastSampleTime = 0;
+};
+
 struct AltitudeState
 {
   float height;
@@ -488,10 +498,12 @@ struct ModelState
   RotationMatrixFloat trimRotation;
 
   AltitudeState altitude;
+  RangefinderState rangefinder;
 
   SetpointState setpoint;
   Control::Pid innerPid[AXIS_COUNT_RPYT];
   Control::Pid outerPid[AXIS_COUNT_RPYT];
+  volatile bool reloadPidPending = false;
 
   MixerState mixer;
   OutputState output;

@@ -8,7 +8,9 @@
 #include "Device/InputSBUS.h"
 #include "Device/InputCRSF.h"
 #include "TelemetryManager.h"
+#include "Device/InputWifi.hpp"
 #if defined(ESPFC_ESPNOW)
+
 #include "Device/InputEspNow.h"
 #endif
 
@@ -49,8 +51,13 @@ class Input
 
     void updateFrameRate();
     Device::InputDevice * getInputDevice();
+    void handleOther()
+    {
+      _wifi.handleNetwork();
+    }
 
   private:
+
     inline float _interpolate(float left, float right, float step)
     {
       return (left * (1.f - step) + right * step);
@@ -65,7 +72,9 @@ class Input
     Device::InputIBUS _ibus;
     Device::InputSBUS _sbus;
     Device::InputCRSF _crsf;
+    Device::InputWifi _wifi;
 #if defined(ESPFC_ESPNOW)
+
     Device::InputEspNow _espnow;
 #endif
 

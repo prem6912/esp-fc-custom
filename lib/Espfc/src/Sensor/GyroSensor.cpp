@@ -9,8 +9,9 @@
 namespace Espfc::Sensor
 {
 
-static constexpr float ESPFC_FUZZY_ACCEL_ZERO = 0.05f;
-static constexpr float ESPFC_FUZZY_GYRO_ZERO = 0.20f;
+static constexpr float ESPFC_FUZZY_ACCEL_ZERO = 0.08f;
+static constexpr float ESPFC_FUZZY_GYRO_ZERO = 0.15f; // ~8.5 deg/sec maximum allowed movement during cal
+
 
 GyroSensor::GyroSensor(Model &model) : _dyn_notch_denom(1), _model(model)
 {
@@ -285,7 +286,7 @@ void FAST_CODE_ATTR GyroSensor::calibrate()
     _model.state.gyro.adc -= _model.state.gyro.bias;
     break;
   case CALIBRATION_START:
-    //_model.state.gyro.bias = VectorFloat();
+    _model.state.gyro.bias = VectorFloat(0.f, 0.f, 0.f);
     _model.state.gyro.biasSamples = 2 * _model.state.gyro.calibrationRate;
     _model.state.gyro.calibrationState = CALIBRATION_UPDATE;
     break;

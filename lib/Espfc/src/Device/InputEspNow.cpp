@@ -37,7 +37,20 @@ InputStatus FAST_CODE_ATTR InputEspNow::update()
     }
     return INPUT_RECEIVED;
   }
+  else if (_wifi)
+  {
+    InputStatus s = _wifi->update();
+    if (s == INPUT_RECEIVED)
+    {
+      for(size_t i = 0; i < CHANNELS; i++)
+      {
+        _channels[i] = _wifi->get(i);
+      }
+      return INPUT_RECEIVED;
+    }
+  }
   return INPUT_IDLE;
+
 }
 
 uint16_t FAST_CODE_ATTR InputEspNow::get(uint8_t i) const

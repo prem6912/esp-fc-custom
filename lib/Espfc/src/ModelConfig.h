@@ -204,8 +204,12 @@ enum Feature {
   FEATURE_RX_SERIAL  = 1 << 3,
   FEATURE_MOTOR_STOP = 1 << 4,
   FEATURE_SOFTSERIAL = 1 << 6,
-  FEATURE_GPS        = 1 << 7,
-  FEATURE_TELEMETRY  = 1 << 10,
+  FEATURE_GPS          = 1 << 7,
+  FEATURE_OPTICAL_FLOW = 1 << 8,
+  FEATURE_RANGEFINDER  = 1 << 9,
+  FEATURE_SONAR        = 1 << 9,
+  FEATURE_TELEMETRY    = 1 << 10,
+
   FEATURE_AIRMODE    = 1 << 22,
   FEATURE_RX_SPI     = 1 << 25,
   FEATURE_DYNAMIC_FILTER = 1 << 29,
@@ -713,16 +717,16 @@ class ModelConfig
 
     // pid controller
     PidConfig pid[FC_PID_ITEM_COUNT] = {
-      [FC_PID_ROLL]  = { .P = 43, .I = 40, .D = 22, .F = 30 },  // ROLL
-      [FC_PID_PITCH] = { .P = 58, .I = 52, .D = 22, .F = 30 },  // PITCH
-      [FC_PID_YAW]   = { .P = 72, .I = 45, .D =  0, .F = 30 },  // YAW
+      [FC_PID_ROLL]  = { .P = 46, .I = 70, .D = 24, .F = 30 },  // ROLL (Tuned for crisp rate damping & zero drift)
+      [FC_PID_PITCH] = { .P = 50, .I = 75, .D = 24, .F = 30 },  // PITCH (Tuned for frame symmetry & strong I-term)
+      [FC_PID_YAW]   = { .P = 85, .I = 85, .D =  0, .F = 30 },  // YAW (Strong heading lock & motor anti-torque)
       [FC_PID_ALT]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // ALTHOLD POS
       [FC_PID_POS]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_P * 100, POSHOLD_I * 100,
       [FC_PID_POSR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // POSHOLD_RATE_P * 10, POSHOLD_RATE_I * 100, POSHOLD_RATE_D * 1000,
       [FC_PID_NAVR]  = { .P =  0, .I =  0, .D =  0, .F =  0 },  // NAV_P * 10, NAV_I * 100, NAV_D * 1000
-      [FC_PID_LEVEL] = { .P = 45, .I =  0, .D =  0, .F =  0 },  // ANGLE/LEVEL
+      [FC_PID_LEVEL] = { .P = 65, .I =  0, .D =  0, .F =  0 },  // ANGLE/LEVEL (Snappy 65 Level P-gain)
       [FC_PID_MAG]   = { .P =  0, .I =  0, .D =  0, .F =  0 },  // MAG
-      [FC_PID_VEL]   = { .P = 80, .I = 60, .D = 40, .F = 20 },  // ALTHOLD VEL
+      [FC_PID_VEL]   = { .P = 28, .I = 22, .D =  8, .F =  0 },  // ALTHOLD VEL (55% hover baseline, true laser-vel, Kd damping)
     };
     YawConfig yaw;
     LevelConfig level;
@@ -920,6 +924,31 @@ class ModelConfig
       output.protocol = ESC_PROTOCOL_BRUSHED;
       output.async = true;
       output.rate = 3000;
+
+      // Default Wi-Fi / Radio Flight Modes
+      conditions[0].id = MODE_ARMED;
+      conditions[0].ch = AXIS_AUX_1 + 0; // AUX 1 (1300..2100)
+      conditions[0].min = 1300;
+      conditions[0].max = 2100;
+
+      conditions[1].id = MODE_ANGLE;
+      conditions[1].ch = AXIS_AUX_1 + 0; // AUX 1 (1300..2100) -> Auto-Level ALWAYS ON with Arm!
+      conditions[1].min = 1300;
+      conditions[1].max = 2100;
+
+      conditions[2].id = MODE_ALTHOLD;
+      conditions[2].ch = AXIS_AUX_1 + 1; // AUX 2 (1700..2100) -> Alt-Hold Switch
+      conditions[2].min = 1700;
+      conditions[2].max = 2100;
+
+      // ADC Battery Monitoring (Pin 35 with 2x 100k ohm divider -> 2.0x scale calibrated to 110)
+      vbat.source = 1;      // Enable ADC Battery Meter
+      vbat.scale = 110;     // Calibrated for 100k:100k divider on ESP32 (4.15V match)
+      vbat.resMult = 2;     // Multiplier 2
+      vbat.resDiv = 10;     // Divisor 10
+      vbat.cellWarning = 350; // 3.50V Warning
+      cellMin = 330;        // 3.30V Empty (0%)
+      cellMax = 420;        // 4.20V Full (100%)
 #endif
     }
 
