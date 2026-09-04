@@ -126,14 +126,18 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
     background: linear-gradient(180deg, #0a0e1a 0%, #141b2d 100%); 
     border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
     transition: bottom 0.3s ease; z-index: 1000;
-    max-height: 90vh; display: flex; flex-direction: column;
+    max-height: 95vh; display: flex; flex-direction: column;
+    touch-action: pan-y !important;
   }
   .pid-modal.open { bottom: 0; }
-  .pid-box { padding: 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .pid-box { 
+    padding: 10px 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px;
+    touch-action: pan-y !important; -webkit-overflow-scrolling: touch;
+  }
   .pid-hdr { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 6px; font-size: 0.85rem; font-weight: 700; }
   
-  .pid-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .pid-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .pid-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .pid-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
   .pid-title { font-size: 0.72rem; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 3px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
   .pid-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; }
   .pid-row input { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; width: 44px; text-align: center; font-size: 0.72rem; font-weight: 700; padding: 2px; }
@@ -141,6 +145,21 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
   .pid-status { text-align: center; font-size: 0.72rem; min-height: 18px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; color: var(--sub); }
   .pid-actions { display: flex; gap: 8px; }
   .pid-actions button { flex: 1; padding: 8px; border-radius: 8px; }
+
+  /* Mobile Landscape Layout: 4 columns so all tuning cards fit on screen */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .pid-modal { height: 100vh; max-height: 100vh; border-radius: 0; }
+    .pid-box { padding: 4px 10px; gap: 4px; }
+    .pid-hdr { padding-bottom: 3px; font-size: 0.75rem; }
+    .pid-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .pid-card { padding: 4px 6px; gap: 2px; border-radius: 8px; }
+    .pid-title { font-size: 0.65rem; padding-bottom: 2px; margin-bottom: 1px; }
+    .pid-row { font-size: 0.65rem; }
+    .pid-row input { width: 36px; padding: 1px; font-size: 0.65rem; }
+    .btn-t { width: 20px; height: 18px; font-size: 0.65rem; }
+    .pid-status { min-height: 14px; font-size: 0.65rem; padding: 2px; }
+    .pid-actions button { padding: 5px; font-size: 0.72rem; }
+  }
 
 </style>
 </head>
@@ -1071,10 +1090,17 @@ public:
             _wsHandshakeDone = false;
             break;
           }
-          if (opcode == 0x09) // Ping frame
+          if (opcode == 0x09) // Ping frame: respond with Pong
           {
             uint8_t pong[2] = {0x8A, 0x00};
             _wsClient.write(pong, 2);
+            continue;
+          }
+          if (opcode == 0x0A) // Pong frame from browser: safely ignore
+          {
+            uint8_t pongLen = b1 & 0x7F;
+            int discard = (b1 & 0x80 ? 4 : 0) + pongLen;
+            while (discard-- > 0 && _wsClient.available()) _wsClient.read();
             continue;
           }
 
@@ -1083,18 +1109,17 @@ public:
 
           if (opcode != 0x02 || !masked || len != 12)
           {
-            _wsClient.stop();
-            _wsHandshakeDone = false;
-            break;
+            // Discard unhandled/malformed frame instead of terminating the link
+            int discard = (masked ? 4 : 0) + len;
+            while (discard-- > 0 && _wsClient.available()) _wsClient.read();
+            continue;
           }
 
           uint8_t frameBuf[16];
           int bytesRead = _wsClient.readBytes((char*)frameBuf, 16);
           if (bytesRead != 16)
           {
-            _wsClient.stop();
-            _wsHandshakeDone = false;
-            break;
+            continue;
           }
 
           uint8_t* mask = frameBuf;

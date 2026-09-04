@@ -56,8 +56,17 @@ public:
   int read()
   {
     if (!_model.state.rangefinder.present) return 0;
+    // The VL53L0X shares the gyro's I2C bus *and* its onError callback (Hardware.cpp:88),
+    // so a laser NAK lands in i2cErrorDelta, which Actuator.cpp:94 reads as a gyro fault and
+    // latches ARMING_DISABLED_NO_GYRO -> instant disarm. The laser polls at 100Hz, so this
+    // disarms every fraction of a second. Keep laser bus errors out of the gyro health check;
+    // i2cErrorCount still accumulates them so total bus health stays visible over MSP.
     int32_t distMm = 0;
-    if (_rangefinder.readMm(distMm))
+    const int16_t errDeltaBefore = _model.state.i2cErrorDelta;
+    const int rc = _rangefinder.readMm(distMm);
+    _model.state.i2cErrorDelta = errDeltaBefore;
+
+    if (rc)
     {
       float rawDistM = (float)distMm * 0.001f;
       _model.state.rangefinder.distance = rawDistM;

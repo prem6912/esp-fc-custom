@@ -949,6 +949,9 @@ class ModelConfig
       vbat.cellWarning = 350; // 3.50V Warning
       cellMin = 330;        // 3.30V Empty (0%)
       cellMax = 420;        // 4.20V Full (100%)
+
+      failsafe.delay = 15;  // 1.5s Failsafe Timeout for Wi-Fi SoftAP Link
+      loopSync = 1;         // 1kHz PID Loop (matched to 1kHz Gyro)
 #endif
     }
 
