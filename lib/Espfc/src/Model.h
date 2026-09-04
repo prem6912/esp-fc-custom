@@ -166,6 +166,20 @@ class Model
 #endif
     }
 
+    bool armingDisabledExcept(ArmingDisabledFlags mask) const
+    {
+#if defined(ESPFC_DEV_PRESET_UNSAFE_ARMING)
+      return false;
+#else
+      return (state.mode.armingDisabledFlags & ~(uint32_t)mask) != 0;
+#endif
+    }
+
+    void resetAttitudeYaw()
+    {
+      state.attitude.euler.set(AXIS_YAW, 0.0f);
+    }
+
     void setArmingDisabled(ArmingDisabledFlags flag, bool value)
     {
       if(value) state.mode.armingDisabledFlags |= flag;

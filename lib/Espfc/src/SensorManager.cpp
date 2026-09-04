@@ -29,7 +29,7 @@ int FAST_CODE_ATTR SensorManager::read()
   if(_model.state.accel.timer.syncTo(_model.state.gyro.timer))
   {
     _accel.update();
-    fusion(); // Calculate 3D orientation fusion immediately without queue latency
+    _fusionUpdate = true;
     _model.state.mode.button = _button.update();
     return 1;
   }
@@ -54,6 +54,13 @@ int FAST_CODE_ATTR SensorManager::preLoop()
   {
     _model.state.gyro.biasSamples = -1;
     _fusion.restoreGain();
+    _fusion.reset();
+    _model.resetAttitudeYaw();
+  }
+  if(_fusionUpdate)
+  {
+    _fusionUpdate = false;
+    fusion(); // Calculate 3D orientation fusion immediately with filtered gyro rates
   }
   return 1;
 }

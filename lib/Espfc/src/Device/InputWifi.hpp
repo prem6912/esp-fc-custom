@@ -73,6 +73,7 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
   
   #btn-arm { color: var(--red); border-color: rgba(255,23,68,0.4); }
   #btn-arm.armed { color: var(--green); border-color: rgba(0,230,118,0.4); animation: pulse 1.5s infinite; }
+  #btn-arm.arming { color: var(--amber); border-color: rgba(255,171,0,0.6); background: rgba(255,171,0,0.15); animation: pulse 0.5s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   
   #btn-alt { color: var(--amber); border-color: rgba(255,171,0,0.4); }
@@ -428,14 +429,39 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
     document.addEventListener('visibilitychange', () => { if (document.hidden) hardReset(); });
   }
 
+  let armIntentTime = 0;
+  let altIntentTime = 0;
+  let fcArmed = false;
+
   const btnArm = document.getElementById('btn-arm');
   function updateArmUI() {
-    btnArm.innerText = isArmed ? '>>> ARMED <<<' : 'DISARMED';
-    btnArm.className = 'btn-hud' + (isArmed ? ' armed' : '');
+    const isWaiting = isArmed && (armIntentTime > 0);
+    if (fcArmed) {
+      btnArm.innerText = '>>> ARMED <<<';
+      btnArm.className = 'btn-hud armed';
+    } else if (isWaiting) {
+      btnArm.innerText = 'ARMING...';
+      btnArm.className = 'btn-hud arming';
+    } else {
+      btnArm.innerText = 'DISARMED';
+      btnArm.className = 'btn-hud';
+    }
   }
   btnArm.addEventListener('click', () => {
-    isArmed = !isArmed;
-    updateArmUI();
+    if (isArmed) {
+      isArmed = false;
+      armIntentTime = 0;
+      updateArmUI();
+    } else {
+      if (throttle > 1050) {
+        throttle = 1000;
+        knobLeft.style.transform = 'translate(0px, 50px)';
+        document.getElementById('disp-thr').innerText = throttle;
+      }
+      isArmed = true;
+      armIntentTime = performance.now();
+      updateArmUI();
+    }
   });
 
   const btnAlt = document.getElementById('btn-alt');
@@ -444,6 +470,7 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
   }
   btnAlt.addEventListener('click', () => {
     isAltHold = !isAltHold;
+    altIntentTime = isAltHold ? performance.now() : 0;
     leftStickRecenterY = isAltHold;
     updateAltUI();
     
@@ -459,14 +486,17 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
 
   document.getElementById('btn-kill').addEventListener('click', () => {
     isArmed = false;
+    armIntentTime = 0;
     throttle = 1000;
     updateArmUI();
     if(isAltHold) {
       isAltHold = false;
+      altIntentTime = 0;
       leftStickRecenterY = false;
       updateAltUI();
       knobLeft.style.transform = 'translate(0px, 50px)';
     }
+    document.getElementById('disp-thr').innerText = throttle;
   });
 
   let ws = null;
@@ -498,6 +528,12 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // Bit order must match ArmingDisabledFlags in ModelConfig.h:485.
+  const ARM_BLOCK_NAMES = ['NO_GYRO','FAILSAFE','RX_FAILSAFE','BAD_RX_RECOVERY','BOXFAILSAFE',
+    'RUNAWAY_TAKEOFF','CRASH','THROTTLE','ANGLE','BOOT_GRACE','NOPREARM','LOAD','CALIBRATING',
+    'CLI','CMS_MENU','BST','MSP','PARALYZE','GPS','RESC','RPMFILTER','REBOOT_REQ','DSHOT_BITBANG',
+    'ACC_CAL','MOTOR_PROTOCOL','ARM_SWITCH'];
 
   function initWebSocket() {
     const wsUrl = 'ws://' + (location.hostname || '192.168.4.1') + ':81/';
@@ -531,7 +567,13 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
             document.getElementById('hud-alt').innerText = `${d.h}cm`;
 
             const sensorEl = document.getElementById('hud-sensor');
-            if (d.lv) {
+            if (d.ad !== undefined && d.ad !== 0) {
+              const names = ARM_BLOCK_NAMES.filter((n, i) => (d.ad >>> i) & 1);
+              // ARM_SWITCH alone just means the switch was held while something else was wrong;
+              // release and re-press ARM to clear it.
+              sensorEl.innerText = 'NO ARM: ' + names.join('+');
+              sensorEl.style.color = 'var(--red)';
+            } else if (d.lv) {
               sensorEl.innerText = '● LASER LOCK';
               sensorEl.style.color = 'var(--green)';
             } else {
@@ -539,15 +581,29 @@ const char JOYSTICK_PAGE[] PROGMEM = R"rawliteral(
               sensorEl.style.color = 'var(--sub)';
             }
 
-            if (d.arm === 0 && isArmed) {
-              isArmed = false;
-              updateArmUI();
+            fcArmed = (d.arm === 1);
+            if (fcArmed) {
+              isArmed = true;
+              armIntentTime = 0;
+            } else if (isArmed) {
+              if (armIntentTime === 0 || (performance.now() - armIntentTime >= 1200)) {
+                isArmed = false;
+                armIntentTime = 0;
+              }
             }
-            if (d.alt === 0 && isAltHold) {
-              isAltHold = false;
-              leftStickRecenterY = false;
-              updateAltUI();
+            updateArmUI();
+
+            if (d.alt === 1) {
+              isAltHold = true;
+              altIntentTime = 0;
+            } else if (isAltHold) {
+              if (altIntentTime === 0 || (performance.now() - altIntentTime >= 1200)) {
+                isAltHold = false;
+                altIntentTime = 0;
+                leftStickRecenterY = false;
+              }
             }
+            updateAltUI();
 
             if (d.arm || isArmed) {
               phoneFlightLog.push({
@@ -1175,11 +1231,18 @@ public:
           int m4 = std::clamp((int)lrintf(_model->state.output.ch[3] * 100.0f), 0, 100);
           float vb = _model->state.battery.voltage;
           int vp = (int)lrintf(_model->state.battery.percentage);
+          // Why the craft refuses to arm, straight from the FC. Bit positions match the
+          // ArmingDisabledFlags enum in ModelConfig.h:485. ARM_SWITCH (bit 25) is a consequence
+          // flag: Actuator.cpp sets it whenever any other flag is active while the arm switch is
+          // already held, and it only clears when the switch goes inactive again.
+          unsigned long ad = (unsigned long)_model->state.mode.armingDisabledFlags;
+          int i2c = (int)_model->state.i2cErrorCount;
+          int lt = (int)_model->state.stats.loopTime();
 
-          char tbuf[192];
+          char tbuf[256];
           int tlen = snprintf(tbuf, sizeof(tbuf),
-                              "{\"r\":%.1f,\"p\":%.1f,\"y\":%.1f,\"h\":%d,\"v\":%d,\"lv\":%d,\"arm\":%d,\"ang\":%d,\"alt\":%d,\"m\":[%d,%d,%d,%d],\"vb\":%.2f,\"vp\":%d}",
-                              r, p, y, h, v, lv ? 1 : 0, arm ? 1 : 0, ang ? 1 : 0, alt ? 1 : 0, m1, m2, m3, m4, vb, vp);
+                              "{\"r\":%.1f,\"p\":%.1f,\"y\":%.1f,\"h\":%d,\"v\":%d,\"lv\":%d,\"arm\":%d,\"ang\":%d,\"alt\":%d,\"m\":[%d,%d,%d,%d],\"vb\":%.2f,\"vp\":%d,\"ad\":%lu,\"i2c\":%d,\"lt\":%d}",
+                              r, p, y, h, v, lv ? 1 : 0, arm ? 1 : 0, ang ? 1 : 0, alt ? 1 : 0, m1, m2, m3, m4, vb, vp, ad, i2c, lt);
 
           if (tlen > 0 && tlen <= 125)
           {

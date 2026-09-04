@@ -142,7 +142,8 @@ void Actuator::updateModeMask()
 
   _model.setArmingDisabled(ARMING_DISABLED_FAILSAFE,    _model.state.failsafe.phase != FC_FAILSAFE_IDLE);
   _model.setArmingDisabled(ARMING_DISABLED_BOXFAILSAFE, _model.isSwitchActive(MODE_FAILSAFE));
-  _model.setArmingDisabled(ARMING_DISABLED_ARM_SWITCH,  _model.armingDisabled() && _model.isSwitchActive(MODE_ARMED));
+  bool otherArmingDisabled = _model.armingDisabledExcept(ARMING_DISABLED_ARM_SWITCH);
+  _model.setArmingDisabled(ARMING_DISABLED_ARM_SWITCH,  otherArmingDisabled && _model.isSwitchActive(MODE_ARMED));
 
   if(_model.state.failsafe.phase != FC_FAILSAFE_IDLE)
   {

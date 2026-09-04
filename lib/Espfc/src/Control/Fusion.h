@@ -16,6 +16,7 @@ class Fusion
     Fusion(Model& model);
     int begin();
     void restoreGain();
+    void reset();
     int update();
 
   private:

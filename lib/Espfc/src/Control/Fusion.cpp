@@ -42,6 +42,19 @@ void Fusion::restoreGain()
   _rtqf.setKp(_model.config.fusion.gain * 0.00005f);
 }
 
+void Fusion::reset()
+{
+  _mahony.reset();
+  _madgwick.reset();
+  _rtqf.reset();
+  for (size_t i = 0; i < 4; i++)
+  {
+    _qFilter[i].begin(FilterConfig(FILTER_BIQUAD, 20), _model.state.accel.timer.rate);
+  }
+  _model.state.attitude.quaternion = Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
+  _model.state.attitude.euler = VectorFloat(0.0f, 0.0f, 0.0f);
+}
+
 int FAST_CODE_ATTR Fusion::update()
 {
   Utils::Stats::Measure measure(_model.state.stats, COUNTER_IMU_FUSION);
@@ -100,6 +113,10 @@ Quaternion Fusion::filterQuaternion(const Quaternion& q)
 
 Quaternion FAST_CODE_ATTR Fusion::madgwickFusion(VectorFloat g, VectorFloat a, VectorFloat m)
 {
+  if (!_useMag && !_model.magActive() && std::fabs(g.z) < 0.003f && std::fabs(g.x) < 0.05f && std::fabs(g.y) < 0.05f)
+  {
+    g.z = 0.0f;
+  }
   if (_useMag && _model.magActive())
   {
     _madgwick.update(g.x, g.y, g.z, a.x, a.y, a.z, m.x, m.y, m.z);
@@ -113,6 +130,10 @@ Quaternion FAST_CODE_ATTR Fusion::madgwickFusion(VectorFloat g, VectorFloat a, V
 
 Quaternion FAST_CODE_ATTR Fusion::mahonyFusion(VectorFloat g, VectorFloat a, VectorFloat m)
 {
+  if (!_useMag && !_model.magActive() && std::fabs(g.z) < 0.003f && std::fabs(g.x) < 0.05f && std::fabs(g.y) < 0.05f)
+  {
+    g.z = 0.0f;
+  }
   if (_useMag && _model.magActive())
   {
     _mahony.update(g.x, g.y, g.z, a.x, a.y, a.z, m.x, m.y, m.z);

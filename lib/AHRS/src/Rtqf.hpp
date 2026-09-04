@@ -17,6 +17,13 @@ public:
     _first = true;
   }
 
+  void reset()
+  {
+    _quaternion = Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
+    _poseQ = Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
+    _first = true;
+  }
+
   void setKp(float kp)
   {
     _slerpPower = kp;

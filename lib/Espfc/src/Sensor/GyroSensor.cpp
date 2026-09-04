@@ -10,10 +10,18 @@ namespace Espfc::Sensor
 {
 
 static constexpr float ESPFC_FUZZY_ACCEL_ZERO = 0.08f;
-static constexpr float ESPFC_FUZZY_GYRO_ZERO = 0.15f; // ~8.5 deg/sec maximum allowed movement during cal
+// 0.20 rad/s (~11.5 deg/s). This gate is compared against the RAW rate, which still contains
+// the sensor's own bias (CALIBRATION_START zeroes state.gyro.bias). A mediocre MPU6050 can idle
+// at a vector magnitude near 0.15, so a tighter gate can stall calibration forever on a still
+// desk -> calibrationActive() never clears -> ARMING_DISABLED_CALIBRATING blocks arming and the
+// bias is never learned, so yaw drifts. Keep this at the stock value AccelSensor.cpp still uses.
+static constexpr float ESPFC_FUZZY_GYRO_ZERO = 0.20f;
 
+// Hard ceiling on how long CALIBRATION_UPDATE may run before we accept whatever bias we have.
+// Without it, a vibrating or noisy airframe leaves the FC permanently un-armable.
+static constexpr int ESPFC_GYRO_CALIBRATION_MAX_TICKS_MULT = 4;
 
-GyroSensor::GyroSensor(Model &model) : _dyn_notch_denom(1), _model(model)
+GyroSensor::GyroSensor(Model &model) : _dyn_notch_denom(1), _model(model), _calibrationTicks(0)
 {
 }
 
@@ -288,6 +296,7 @@ void FAST_CODE_ATTR GyroSensor::calibrate()
   case CALIBRATION_START:
     _model.state.gyro.bias = VectorFloat(0.f, 0.f, 0.f);
     _model.state.gyro.biasSamples = 2 * _model.state.gyro.calibrationRate;
+    _calibrationTicks = 0;
     _model.state.gyro.calibrationState = CALIBRATION_UPDATE;
     break;
   case CALIBRATION_UPDATE:
@@ -300,7 +309,12 @@ void FAST_CODE_ATTR GyroSensor::calibrate()
       _model.state.gyro.bias += (_model.state.gyro.adc - _model.state.gyro.bias) * _model.state.gyro.biasAlpha;
       _model.state.gyro.biasSamples--;
     }
-    if (_model.state.gyro.biasSamples <= 0)
+    _calibrationTicks++;
+    // Bail out with the bias learned so far rather than hanging in CALIBRATION_UPDATE forever:
+    // while this state is active calibrationActive() is true, which keeps ARMING_DISABLED_CALIBRATING
+    // asserted and makes the craft impossible to arm.
+    const int maxTicks = ESPFC_GYRO_CALIBRATION_MAX_TICKS_MULT * 2 * _model.state.gyro.calibrationRate;
+    if (_model.state.gyro.biasSamples <= 0 || (maxTicks > 0 && _calibrationTicks >= maxTicks))
       _model.state.gyro.calibrationState = CALIBRATION_APPLY;
   }
   break;

@@ -924,6 +924,7 @@ class ModelConfig
       output.protocol = ESC_PROTOCOL_BRUSHED;
       output.async = true;
       output.rate = 3000;
+      arming.smallAngle = 180; // Allow arming at any angle (whoop/micro drone standard)
 
       // Default Wi-Fi / Radio Flight Modes
       conditions[0].id = MODE_ARMED;

@@ -46,6 +46,7 @@ class GyroSensor: public BaseSensor
 
     Model& _model;
     Device::GyroDevice * _gyro;
+    int _calibrationTicks;
 
 #ifdef ESPFC_DSP
     Utils::FFTAnalyzer<128> _fft[3];
